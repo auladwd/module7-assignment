@@ -132,10 +132,14 @@ async function initDB() {
   }
 }
 
-// ─── Start ────────────────────────────────────────────────────────────────────
-initDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📊 Metrics available at http://localhost:${PORT}/metrics`);
+// ─── Start (only when run directly, not during tests) ────────────────────────
+if (require.main === module) {
+  initDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📊 Metrics available at http://localhost:${PORT}/metrics`);
+    });
   });
-});
+}
+
+module.exports = app;
