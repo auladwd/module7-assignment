@@ -1,0 +1,34 @@
+# Environment files — NEVER commit these!
+.env
+.env.local
+.env.production
+.env.example
+
+# Node.js
+app/node_modules/
+app/coverage/
+app/npm-debug.log*
+
+# Docker volumes (local data)
+postgres_data/
+prometheus_data/
+grafana_data/
+
+# Backups
+backups/
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# SSH Keys
+*.pem
+*.key
+deploy_key

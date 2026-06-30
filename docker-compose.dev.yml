@@ -1,0 +1,27 @@
+version: '3.8'
+
+# ─── Local Development Overrides ──────────────────────────────────────────────
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# This adds hot-reload, exposed ports, and dev tools
+
+services:
+  app:
+    build:
+      context: ./app
+      target: builder          # Use builder stage (has devDependencies)
+    volumes:
+      - ./app:/app             # Mount source for hot-reload
+      - /app/node_modules      # Keep container's node_modules
+    environment:
+      NODE_ENV: development
+    command: npx nodemon index.js
+    ports:
+      - "3000:3000"            # Expose app directly in dev
+
+  postgres:
+    ports:
+      - "5432:5432"            # Expose DB for local DB clients (TablePlus, DBeaver)
+
+  nginx:
+    ports:
+      - "8080:80"              # Use 8080 locally to avoid conflicts

@@ -1,0 +1,107 @@
+global:
+  # ─── SMTP Configuration (Gmail example) ───────────────────────────────────
+  smtp_smarthost: '${SMTP_HOST:-smtp.gmail.com:587}'
+  smtp_from: '${SMTP_FROM:-alerts@yourdomain.com}'
+  smtp_auth_username: '${SMTP_USER}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+  # Resolve timeout
+  resolve_timeout: 5m
+
+# ─── Templates ─────────────────────────────────────────────────────────────────
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# ─── Routing ──────────────────────────────────────────────────────────────────
+route:
+  receiver: 'email-alerts'          # Default receiver
+  group_by: ['alertname', 'severity']
+  group_wait:      30s              # Wait before sending first notification
+  group_interval:  5m               # Wait before sending updates
+  repeat_interval: 4h               # Re-notify after 4 hours if still firing
+
+  routes:
+    # Critical alerts — notify immediately, repeat every 1 hour
+    - match:
+        severity: critical
+      receiver: 'email-critical'
+      repeat_interval: 1h
+      continue: true
+
+    # Warning alerts — standard routing
+    - match:
+        severity: warning
+      receiver: 'email-alerts'
+      repeat_interval: 4h
+
+# ─── Receivers ────────────────────────────────────────────────────────────────
+receivers:
+
+  # Standard alerts
+  - name: 'email-alerts'
+    email_configs:
+      - to: '${ALERT_EMAIL:-admin@yourdomain.com}'
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }} - Module 7 Monitor'
+        html: |
+          <!DOCTYPE html>
+          <html>
+          <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2 style="color: {{ if eq .Status "firing" }}#d32f2f{{ else }}#388e3c{{ end }}">
+              {{ if eq .Status "firing" }}🔥 ALERT FIRING{{ else }}✅ ALERT RESOLVED{{ end }}
+            </h2>
+            {{ range .Alerts }}
+            <div style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px;">
+              <h3>{{ .Annotations.summary }}</h3>
+              <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+              <p><strong>Severity:</strong> {{ .Labels.severity }}</p>
+              <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
+              <p><strong>Started at:</strong> {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}</p>
+              {{ if eq $.Status "resolved" }}
+              <p><strong>Resolved at:</strong> {{ .EndsAt.Format "2006-01-02 15:04:05 UTC" }}</p>
+              {{ end }}
+            </div>
+            {{ end }}
+            <hr>
+            <p style="color: #666; font-size: 12px;">
+              Sent from Module 7 Observability Stack | 
+              <a href="http://YOUR_EC2_IP:9090">Prometheus</a> | 
+              <a href="http://YOUR_EC2_IP:3001">Grafana</a>
+            </p>
+          </body>
+          </html>
+
+  # Critical alerts (same email but different subject prefix)
+  - name: 'email-critical'
+    email_configs:
+      - to: '${ALERT_EMAIL:-admin@yourdomain.com}'
+        send_resolved: true
+        headers:
+          Subject: '🔴 [CRITICAL] {{ .GroupLabels.alertname }} - IMMEDIATE ACTION REQUIRED'
+        html: |
+          <!DOCTYPE html>
+          <html>
+          <body style="font-family: Arial, sans-serif; padding: 20px; background: #fff3f3;">
+            <h1 style="color: #d32f2f;">🚨 CRITICAL ALERT</h1>
+            {{ range .Alerts }}
+            <div style="border: 2px solid #d32f2f; padding: 15px; margin: 10px 0; border-radius: 5px;">
+              <h2>{{ .Annotations.summary }}</h2>
+              <p>{{ .Annotations.description }}</p>
+              <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
+              <p><strong>Time:</strong> {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}</p>
+            </div>
+            {{ end }}
+            <p><strong>Please investigate immediately!</strong></p>
+          </body>
+          </html>
+
+# ─── Inhibition Rules ─────────────────────────────────────────────────────────
+inhibit_rules:
+  # If critical is firing, suppress warning for same alertname
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']

@@ -1,0 +1,141 @@
+groups:
+  # ─── System Resource Alerts ────────────────────────────────────────────────
+  - name: system_resources
+    interval: 30s
+    rules:
+
+      # CPU Usage > 80% for 5 minutes
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ High CPU Usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.2f\" }}% (threshold: 80%) for 5 minutes."
+
+      # CPU Usage > 95% for 2 minutes — Critical
+      - alert: CriticalCPUUsage
+        expr: |
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🔴 CRITICAL CPU Usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.2f\" }}% (threshold: 95%) — immediate attention needed!"
+
+      # RAM Usage > 80%
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ High Memory Usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | printf \"%.2f\" }}% (threshold: 80%)."
+
+      # RAM Usage > 95% — Critical
+      - alert: CriticalMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🔴 CRITICAL Memory Usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | printf \"%.2f\" }}% — system may crash soon!"
+
+      # Disk Usage > 80%
+      - alert: HighDiskUsage
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs"})) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ High Disk Usage on {{ $labels.instance }}"
+          description: "Disk {{ $labels.mountpoint }} usage is {{ $value | printf \"%.2f\" }}% (threshold: 80%)."
+
+      # Disk Usage > 90% — Critical
+      - alert: CriticalDiskUsage
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs"})) * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🔴 CRITICAL Disk Usage on {{ $labels.instance }}"
+          description: "Disk {{ $labels.mountpoint }} usage is {{ $value | printf \"%.2f\" }}% — disk almost full!"
+
+      # High Network Traffic Inbound > 100 MB/s
+      - alert: HighNetworkTrafficIn
+        expr: |
+          rate(node_network_receive_bytes_total{device!~"lo"}[5m]) / 1024 / 1024 > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ High Inbound Network Traffic on {{ $labels.instance }}"
+          description: "Inbound traffic on {{ $labels.device }} is {{ $value | printf \"%.2f\" }} MB/s."
+
+      # High Network Traffic Outbound > 100 MB/s
+      - alert: HighNetworkTrafficOut
+        expr: |
+          rate(node_network_transmit_bytes_total{device!~"lo"}[5m]) / 1024 / 1024 > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ High Outbound Network Traffic on {{ $labels.instance }}"
+          description: "Outbound traffic on {{ $labels.device }} is {{ $value | printf \"%.2f\" }} MB/s."
+
+  # ─── Application Alerts ────────────────────────────────────────────────────
+  - name: application_alerts
+    interval: 30s
+    rules:
+
+      # App is down
+      - alert: AppDown
+        expr: up{job="backend_app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🔴 Backend Application is DOWN"
+          description: "The backend application has been unreachable for more than 1 minute."
+
+      # Node Exporter is down
+      - alert: NodeExporterDown
+        expr: up{job="node_exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🔴 Node Exporter is DOWN"
+          description: "Node Exporter has been unreachable — system metrics unavailable."
+
+      # High HTTP Error Rate > 5%
+      - alert: HighHTTPErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5.."}[5m]) /
+          rate(http_requests_total[5m]) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ High HTTP Error Rate"
+          description: "HTTP 5xx error rate is {{ $value | printf \"%.2f\" }}% (threshold: 5%)."
+
+      # Slow API Response > 2 seconds
+      - alert: SlowAPIResponse
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ Slow API Response Time"
+          description: "95th percentile response time is {{ $value | printf \"%.2f\" }}s (threshold: 2s)."
