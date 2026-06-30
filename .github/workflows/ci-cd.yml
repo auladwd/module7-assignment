@@ -43,12 +43,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: app/package-lock.json
+          # No npm cache configured: this repo doesn't commit a real
+          # package-lock.json yet, so caching against it has no value
+          # and a stale/corrupted cache can cause EINTEGRITY errors.
+
+      - name: 🧹 Clean npm cache
+        working-directory: ./app
+        run: |
+          npm cache clean --force
+          npm cache verify || true
 
       - name: 📦 Install dependencies
         working-directory: ./app
-        run: npm ci
+        run: npm install
 
       - name: 🧪 Run unit tests
         working-directory: ./app
